@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
+  Picker,
   ImageBackground,
 } from "react-native";
 import { Button } from "react-native-elements";
@@ -15,21 +16,26 @@ import { callDefaultToast } from "../../../../helper/toastHelper";
 import { AUTH_TOKEN, storeData } from "../../../../helper/storageHelper";
 import { Actions } from "react-native-router-flux";
 
-const LoginContainer = (props) => {
+const SignupContainer = (props) => {
   const [username, setUsername] = React.useState();
   const [password, setPassword] = React.useState();
+  const [accountType, setAccountType] = React.useState("premium");
+  const [email, setEmail] = React.useState();
 
-  const onLoginPress = async () => {
+  const onSignupPress = async () => {
     try {
-      const response = await api.login({
+      const response = await api.addNewUser({
+        email: email,
+        accountType: accountType,
         username: username,
         password: password,
       });
       if (response.data !== null) {
-        await storeData(AUTH_TOKEN, JSON.stringify(response.data));
-        Actions.home();
+        await storeData(AUTH_TOKEN, response.data?.token);
+        callDefaultToast("Account created.");
+        Actions.login();
       } else {
-        callDefaultToast("Credentials are wrong.");
+        callDefaultToast("Credentials are taken. Change and try again.");
       }
     } catch (e) {
       callDefaultToast("Network error. Try again later.");
@@ -45,7 +51,30 @@ const LoginContainer = (props) => {
             style={styles.image}
           >
             <View style={styles.loginFormView}>
-              <Text style={styles.logoText}>Login</Text>
+              <Text style={styles.logoText}>Signup</Text>
+              <View
+                style={{
+                  ...styles.loginFormTextInput,
+                  width: "40%",
+                  alignSelf: "center",
+                }}
+              >
+                <Picker
+                  selectedValue={accountType}
+                  onValueChange={(value) => setAccountType(value)}
+                >
+                  <Picker.Item label="Premium" value="premium" />
+                  <Picker.Item label="Free" value="free" />
+                </Picker>
+              </View>
+              <TextInput
+                placeholder="Email"
+                placeholderColor="#c4c3cb"
+                value={email}
+                onChangeText={setEmail}
+                style={styles.loginFormTextInput}
+                keyboardType={"email-address"}
+              />
               <TextInput
                 placeholder="Username"
                 placeholderColor="#c4c3cb"
@@ -63,13 +92,13 @@ const LoginContainer = (props) => {
               />
               <Button
                 buttonStyle={styles.loginButton}
-                onPress={onLoginPress}
-                title="Login"
+                onPress={onSignupPress}
+                title="Sign up"
               />
               <Button
                 buttonStyle={styles.loginButton}
-                onPress={Actions.signup}
-                title="Sign up"
+                onPress={Actions.login}
+                title="Go to Login page"
               />
               <Button
                 buttonStyle={styles.loginButton}
@@ -84,4 +113,4 @@ const LoginContainer = (props) => {
   );
 };
 
-export default LoginContainer;
+export default SignupContainer;

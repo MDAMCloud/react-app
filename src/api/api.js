@@ -1,116 +1,134 @@
-import endpoints from './endpoints';
-import {promiseTimeout, TIMEOUT} from '../helper/promiseHelper';
-import {callDefaultToast} from '../helper/toastHelper';
+import endpoints from "./endpoints";
+import { promiseTimeout, TIMEOUT } from "../helper/promiseHelper";
+import { callDefaultToast } from "../helper/toastHelper";
 
 const METHODS = {
-	GET: 'get',
-	POST: 'post',
-	PUT: 'put',
-	DELETE: 'delete',
+  GET: "get",
+  POST: "post",
+  PUT: "put",
+  DELETE: "delete",
 };
 
 const create = () => {
-	function initialize() {
-		return (method, endpoint, data, headers = {}) => {
-			let fullUrl = `https://auth-service-cloud-stage.herokuapp.com${endpoint}`;
-			const fullHeaders = {
-				...headers,
-				'Cache-Control': 'no-cache',
-				'Content-Type': 'application/json',
-			};
+  function initialize() {
+    return (base, method, endpoint, data, headers = {}) => {
+      let fullUrl;
+      if (base === 1) {
+        fullUrl = `https://auth-service-cloud.herokuapp.com${endpoint}`;
+      } else {
+        fullUrl = `http://mdam.tech${endpoint}`;
+      }
 
-			/* Serialize data to url on get methods */
-			if (method === METHODS.GET && data) {
-				const paramUrl = Object.entries(data)
-					.map(([key, value]) => `${key}=${value}`)
-					.join('&');
-				fullUrl = `${fullUrl}?${paramUrl}`;
-			}
+      const fullHeaders = {
+        ...headers,
+        "Cache-Control": "no-cache",
+        "Content-Type": "application/json",
+      };
 
-			let request = {
-				method,
-				headers: fullHeaders,
-			};
-			if (method !== METHODS.GET) {
-				request = {...request, body: data ? JSON.stringify(data) : undefined};
-			}
+      /* Serialize data to url on get methods */
+      if (method === METHODS.GET && data) {
+        const paramUrl = Object.entries(data)
+          .map(([key, value]) => `${key}=${value}`)
+          .join("&");
+        fullUrl = `${fullUrl}?${paramUrl}`;
+      }
 
-			return fetch(fullUrl, request);
-		};
-	}
+      let request = {
+        method,
+        headers: fullHeaders,
+      };
+      if (method !== METHODS.GET) {
+        request = { ...request, body: data ? JSON.stringify(data) : undefined };
+      }
 
-	let api = initialize();
+      console.log(fullUrl, request)
 
-	const refresh = () => {
-		api = initialize();
-	};
+      return fetch(fullUrl, request);
+    };
+  }
 
-	const getRequest = (url, parameters) => api(METHODS.GET, url, parameters);
-	const postRequest = (url, parameters) => api(METHODS.POST, url, parameters);
-	const putRequest = (url, parameters) => api(METHODS.PUT, url, parameters);
-	const deleteRequest = (url, parameters) =>
-		api(METHODS.DELETE, url, parameters);
+  let api = initialize();
 
-	const get = (url, data) => process(() => getRequest(url, data));
-	const post = (url, data = {}) => process(() => postRequest(url, data));
-	const put = (url, data = {}) => process(() => putRequest(url, data));
-	const deleteReq = (url, data = {}) => process(() => deleteRequest(url, data));
+  const refresh = () => {
+    api = initialize();
+  };
 
-	const process = request => {
-		const call = request()
-			.then(resolveResponse)
-			.catch(ignored => ({ok: false, data: null}));
-		return new Promise(resolve => {
-			promiseTimeout(call, TIMEOUT.API_TIMEOUT)
-				.then(resolve)
-				.catch(() => {
-					callDefaultToast('İstek zaman aşımına uğradı. Tekrar deneyiniz');
-					resolve({ok: false, data: null});
-				});
-		}).catch(console.log);
-	};
+  const getRequest = (base, url, parameters) =>
+    api(base, METHODS.GET, url, parameters);
+  const postRequest = (base, url, parameters) =>
+    api(base, METHODS.POST, url, parameters);
+  const putRequest = (base, url, parameters) =>
+    api(base, METHODS.PUT, url, parameters);
+  const deleteRequest = (base, url, parameters) =>
+    api(base, METHODS.DELETE, url, parameters);
 
-	async function resolveResponse(fetchResponseWrapper) {
-		try {
-			let response = null;
-			try {
-				/* On void function case, they will return no data hence response.json() will fail */
-				response = await fetchResponseWrapper.json();
-			} catch (ignored) {}
-			/* if dataWrapper has successful property it should be app response wrapper */
-			// eslint-disable-next-line no-prototype-builtins
-			if (response?.hasOwnProperty('successful')) {
-				/* handle as app response */
-				const ok = response?.successful ?? false;
-				return {
-					ok,
-					type: fetchResponseWrapper.type,
-					headers: fetchResponseWrapper?.headers?.map ?? {},
-					status: fetchResponseWrapper.status,
-					data: ok ? response?.data : null,
-				};
-			} else {
-				const {ok} = fetchResponseWrapper;
-				return {
-					ok,
-					type: fetchResponseWrapper.type,
-					headers: fetchResponseWrapper?.headers?.map ?? {},
-					status: fetchResponseWrapper.status,
-					data: ok ? response : null,
-				};
-			}
-		} catch (e) {
-			return {
-				ok: false,
-				type: fetchResponseWrapper.type,
-				headers: fetchResponseWrapper?.headers?.map ?? {},
-				status: fetchResponseWrapper.status,
-				data: null,
-			};
-		}
-	}
+  const get = (base, url, data = {}) =>
+    process(() => getRequest(base, url, data));
+  const post = (base, url, data = {}) =>
+    process(() => postRequest(base, url, data));
+  const put = (base, url, data = {}) =>
+    process(() => putRequest(base, url, data));
+  const deleteReq = (base, url, data = {}) =>
+    process(() => deleteRequest(base, url, data));
 
-	return endpoints({get, post, put, deleteReq}, refresh);
+  const process = (request) => {
+    const call = request()
+      .then(resolveResponse)
+      .catch((ignored) => ({ ok: false, data: null }));
+    return new Promise((resolve) => {
+      promiseTimeout(call, TIMEOUT.API_TIMEOUT)
+        .then(resolve)
+        .catch(() => {
+          callDefaultToast("The request timed out. Try again.");
+          resolve({ ok: false, data: null });
+        });
+    }).catch(console.log);
+  };
+
+  async function resolveResponse(fetchResponseWrapper) {
+    try {
+      let response = null;
+      try {
+        /* On void function case, they will return no data hence response.json() will fail */
+        response = await fetchResponseWrapper.json();
+      } catch (ignored) {}
+      /* if dataWrapper has successful property it should be app response wrapper */
+      // eslint-disable-next-line no-prototype-builtins
+			console.log(response);
+      if (response?.hasOwnProperty("successful")) {
+        /* handle as app response */
+        const ok = response?.successful ?? false;
+        return {
+          ok,
+          type: fetchResponseWrapper.type,
+          headers: fetchResponseWrapper?.headers?.map ?? {},
+          status: fetchResponseWrapper.status,
+          data: ok ? response?.data : null,
+					errorReason: response?.errorReason
+        };
+      } else {
+        const { ok } = fetchResponseWrapper;
+        return {
+          ok,
+          type: fetchResponseWrapper.type,
+          headers: fetchResponseWrapper?.headers?.map ?? {},
+          status: fetchResponseWrapper.status,
+          data: ok ? response : null,
+					errorReason: response?.errorReason
+        };
+      }
+    } catch (e) {
+      return {
+        ok: false,
+        type: fetchResponseWrapper.type,
+        headers: fetchResponseWrapper?.headers?.map ?? {},
+        status: fetchResponseWrapper.status,
+        data: null
+      };
+    }
+  }
+
+  return endpoints({ get, post, put, deleteReq }, refresh);
 };
 
 export default create();
